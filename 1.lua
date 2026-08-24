@@ -581,41 +581,129 @@ local function applyDisableFishNotif(on)
 end
 
 -- [8] WALK ON WATER
+-- [8] WALK ON WATER - FIXED
 local wowPlatform = nil
 local wowThread = nil
-local function ensureWowPlatform(pos)
+local wowConnection = nil
+
+local function createWaterPlatform(position)
     if wowPlatform and wowPlatform.Parent then
-        wowPlatform.Position = pos - Vector3.new(0, 3, 0)
-        return
+        wowPlatform.Position = position
+        return wowPlatform
     end
+    
     wowPlatform = Instance.new("Part")
-    wowPlatform.Name = "NiCH_WoW"
-    wowPlatform.Size = Vector3.new(8, 1, 8)
+    wowPlatform.Name = "NiCH_WoW_Platform"
+    wowPlatform.Size = Vector3.new(10, 1, 10)
     wowPlatform.Anchored = true
     wowPlatform.CanCollide = true
-    wowPlatform.Transparency = 0.85
-    wowPlatform.Position = pos - Vector3.new(0, 3, 0)
+    wowPlatform.CanQuery = false
+    wowPlatform.CanTouch = true
+    wowPlatform.Transparency = 0.7
+    wowPlatform.Material = Enum.Material.Ice
+    wowPlatform.Color = Color3.fromRGB(100, 150, 255)
+    wowPlatform.Position = position
     wowPlatform.Parent = workspace
+    
+    -- Tambahkan visual effect agar terlihat seperti es
+    local highlight = Instance.new("SelectionBox")
+    highlight.Adornee = wowPlatform
+    highlight.Color3 = Color3.fromRGB(100, 150, 255)
+    highlight.LineThickness = 0.05
+    highlight.Transparency = 0.5
+    highlight.Parent = wowPlatform
+    
+    return wowPlatform
+end
+
+local function removeWaterPlatform()
+    if wowPlatform then
+        pcall(function() 
+            wowPlatform:Destroy() 
+        end)
+        wowPlatform = nil
+    end
 end
 
 local function applyWalkOnWater(on)
     if on then
-        if wowThread then task.cancel(wowThread) end
+        -- Stop existing thread jika ada
+        if wowThread then 
+            task.cancel(wowThread) 
+            wowThread = nil 
+        end
+        
+        -- Disconnect existing connection
+        if wowConnection then 
+            wowConnection:Disconnect() 
+            wowConnection = nil 
+        end
+        
+        -- Buat thread untuk update posisi platform
         wowThread = task.spawn(function()
             while Config.WalkOnWater do
                 local hrp = getHrp()
-                if hrp and hrp.Position.Y < 5 then
-                    ensureWowPlatform(hrp.Position)
+                local char = getCharacter()
+                
+                if hrp and char then
+                    local humanoid = char:FindFirstChildOfClass("Humanoid")
+                    
+                    -- Cek apakah player di atas air (Y position rendah)
+                    if humanoid and hrp.Position.Y < 3 then
+                        -- Buat platform di bawah kaki player
+                        local platformPos = hrp.Position - Vector3.new(0, 3.5, 0)
+                        createWaterPlatform(platformPos)
+                        
+                        -- Set state swimming menjadi false jika memungkinkan
+                        if humanoid:GetState() == Enum.HumanoidStateType.Swimming then
+                            -- Force player keluar dari swimming state
+                            hrp.Velocity = Vector3.new(0, 0, 0)
+                            hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                        end
+                    elseif wowPlatform and wowPlatform.Parent then
+                        -- Jika player tidak di air, hapus platform
+                        removeWaterPlatform()
+                    end
                 end
-                task.wait(0.2)
+                
+                task.wait(0.1)
             end
+            
+            -- Cleanup saat loop selesai
+            removeWaterPlatform()
         end)
+        
+        Notify("Walk On Water", "ON — Platform es dibuat otomatis", 2)
     else
-        if wowThread then task.cancel(wowThread) wowThread = nil end
-        if wowPlatform then pcall(function() wowPlatform:Destroy() end) wowPlatform = nil end
+        -- Stop thread
+        if wowThread then 
+            task.cancel(wowThread) 
+            wowThread = nil 
+        end
+        
+        -- Disconnect connection
+        if wowConnection then 
+            wowConnection:Disconnect() 
+            wowConnection = nil 
+        end
+        
+        -- Hapus platform
+        removeWaterPlatform()
+        
+        Notify("Walk On Water", "OFF", 2)
     end
 end
 
+-- Optional: Tambahkan connection untuk handle player teleport/respawn
+table.insert(Conns, LocalPlayer.CharacterAdded:Connect(function(char)
+    if Config.WalkOnWater then
+        task.wait(1)
+        -- Restart walk on water untuk character baru
+        applyWalkOnWater(false)
+        task.wait(0.1)
+        applyWalkOnWater(true)
+    end
+end))
 -- [9] AUTO EQUIP DIVING GEAR
 local function applyAutoDivingGear(on)
     if not on then return end
