@@ -372,47 +372,234 @@ local function applyLockPosition(on)
 end
 
 -- [5] SHOW REAL PING PANEL
-local pingGui, pingLabel = nil, nil
+local pingGui = nil
 local pingThread = nil
+
+local function CreateStreePanel()
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local Stats = game:GetService("Stats")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    local player = Players.LocalPlayer
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "StreeMiniPanel"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.Enabled = false
+    gui.Parent = CoreGui
+
+    -- Frame utama (ukuran responsif)
+    local main = Instance.new("Frame")
+    main.Size = UDim2.new(0, 245, 0, 92)
+    main.Position = UDim2.new(0.5, -122.5, 1, -130)
+    main.BackgroundColor3 = Color3.fromRGB(20, 0, 40)
+    main.BackgroundTransparency = 0.25
+    main.BorderSizePixel = 0
+    main.Active = true
+    main.Parent = gui
+
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
+
+    local stroke = Instance.new("UIStroke", main)
+    stroke.Color = Color3.fromRGB(140, 0, 255)
+    stroke.Thickness = 2
+
+    -- Header
+    local header = Instance.new("Frame", main)
+    header.Size = UDim2.new(1, 0, 0, 28)
+    header.BackgroundColor3 = Color3.fromRGB(40, 0, 80)
+    header.BackgroundTransparency = 0.85
+    header.BorderSizePixel = 0
+
+    local logo = Instance.new("ImageLabel", header)
+    logo.Image = "rbxassetid://77194008928196"
+    logo.Size = UDim2.new(0, 20, 0, 20)
+    logo.Position = UDim2.new(0, 8, 0.5, -10)
+    logo.BackgroundTransparency = 1
+    logo.ImageColor3 = Color3.fromRGB(140, 0, 255)
+
+    local title = Instance.new("TextLabel", header)
+    title.Size = UDim2.new(1, -40, 1, 0)
+    title.Position = UDim2.new(0, 34, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 13
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Text = "REALTIME STATS"
+    title.TextColor3 = Color3.fromRGB(140, 0, 255)
+
+    -- Stats Container
+    local statsFrame = Instance.new("Frame", main)
+    statsFrame.Position = UDim2.new(0, 8, 0, 32)
+    statsFrame.Size = UDim2.new(1, -16, 1, -38)
+    statsFrame.BackgroundTransparency = 1
+
+    local layout = Instance.new("UIListLayout", statsFrame)
+    layout.FillDirection = Enum.FillDirection.Horizontal
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    layout.Padding = UDim.new(0, 8)
+
+    local function makeStat()
+        local box = Instance.new("Frame")
+        box.Size = UDim2.new(0, 52, 1, 0)
+        box.BackgroundColor3 = Color3.fromRGB(30, 0, 60)
+        box.BackgroundTransparency = 0.15
+        box.BorderSizePixel = 0
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
+
+        local stroke = Instance.new("UIStroke", box)
+        stroke.Color = Color3.fromRGB(140, 0, 255)
+        stroke.Thickness = 1.5
+
+        local label = Instance.new("TextLabel", box)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 11.5
+        label.TextWrapped = true
+        label.TextColor3 = Color3.fromRGB(220, 200, 255)
+
+        box.Parent = statsFrame
+        return label
+    end
+
+    local pingLabel  = makeStat()
+    local fpsLabel   = makeStat()
+    local notifLabel = makeStat()
+    local timeLabel  = makeStat()
+
+    -- Draggable
+    local dragging = false
+    local dragStart, startPos
+
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X, 
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    -- FPS Counter
+    local frames = 0
+    local fps = 0
+    local last = tick()
+
+    RunService.RenderStepped:Connect(function()
+        frames += 1
+        if tick() - last >= 1 then
+            fps = frames
+            frames = 0
+            last = tick()
+        end
+    end)
+
+    local function getPing()
+        local net = Stats:FindFirstChild("Network")
+        if net and net:FindFirstChild("ServerStatsItem") then
+            local item = net.ServerStatsItem:FindFirstChild("Data Ping")
+            if item then return math.floor(item:GetValue()) end
+        end
+        return 0
+    end
+
+    local function getTotalNotifications()
+        local success, count = pcall(function()
+            local textNotifications = playerGui:FindFirstChild("Text Notifications")
+            if textNotifications then
+                local frame = textNotifications:FindFirstChild("Frame")
+                if frame then
+                    local notifCount = 0
+                    for _, child in ipairs(frame:GetChildren()) do
+                        if child.Name == "Tile" then notifCount += 1 end
+                    end
+                    return notifCount
+                end
+            end
+            return 0
+        end)
+        return success and count or 0
+    end
+
+    local sessionStartTime = tick()
+
+    local function formatTime(seconds)
+        local hours = math.floor(seconds / 3600)
+        local mins = math.floor((seconds % 3600) / 60)
+        local secs = math.floor(seconds % 60)
+        if hours > 0 then
+            return string.format("%02d:%02d:%02d", hours, mins, secs)
+        else
+            return string.format("%02d:%02d", mins, secs)
+        end
+    end
+
+    local function color(label, v, y, r)
+        if v >= r then
+            label.TextColor3 = Color3.fromRGB(255, 80, 80)
+        elseif v >= y then
+            label.TextColor3 = Color3.fromRGB(255, 220, 0)
+        else
+            label.TextColor3 = Color3.fromRGB(0, 255, 120)
+        end
+    end
+
+    -- Update Loop
+    task.spawn(function()
+        while gui.Parent do
+            local ping = getPing()
+            local notifCount = getTotalNotifications()
+            local elapsed = tick() - sessionStartTime
+            local timerText = formatTime(elapsed)
+
+            pingLabel.Text  = "PING\n" .. ping .. "ms"
+            fpsLabel.Text   = "FPS\n" .. fps
+            notifLabel.Text = "NOTIF\n" .. notifCount
+            timeLabel.Text  = "TIME\n" .. timerText
+
+            color(pingLabel, ping, 120, 200)
+            color(fpsLabel, fps, 40, 90)
+            color(notifLabel, notifCount, 8, 20)
+
+            task.wait(1)
+        end
+    end)
+
+    return gui
+end
+
 local function applyShowPing(on)
     if on then
         if not pingGui then
-            pingGui = Instance.new("ScreenGui")
-            pingGui.Name = "NiCH_Ping"
-            pingGui.Parent = game:GetService("CoreGui")
-            pingGui.ResetOnSpawn = false
-            pingLabel = Instance.new("TextLabel")
-            pingLabel.Size = UDim2.new(0, 150, 0, 26)
-            pingLabel.Position = UDim2.new(0, 8, 0, 250)
-            pingLabel.BackgroundColor3 = Color3.fromRGB(10, 8, 15)
-            pingLabel.BackgroundTransparency = 0.35
-            pingLabel.TextColor3 = Color3.fromRGB(138, 43, 226)
-            pingLabel.Font = Enum.Font.GothamBold
-            pingLabel.TextSize = 13
-            pingLabel.Text = "Ping: ..."
-            pingLabel.Parent = pingGui
-            local c = Instance.new("UICorner", pingLabel)
-            c.CornerRadius = UDim.new(0, 6)
+            pingGui = CreateStreePanel()
         end
         pingGui.Enabled = true
-        if pingThread then task.cancel(pingThread) end
-        pingThread = task.spawn(function()
-            while Config.ShowRealPing do
-                local ping = 0
-                pcall(function()
-                    local statsItem = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]
-                    ping = math.floor(statsItem:GetValue())
-                end)
-                if pingLabel then
-                    pingLabel.Text = ("Ping: %d ms"):format(ping)
-                    pingLabel.TextColor3 = ping < 100 and Color3.fromRGB(34,197,94)
-                        or (ping < 200 and Color3.fromRGB(234,179,8) or Color3.fromRGB(226,43,46))
-                end
-                task.wait(0.5)
-            end
-        end)
     else
-        if pingGui then pingGui.Enabled = false end
+        if pingGui then
+            pingGui.Enabled = false
+        end
     end
 end
 
