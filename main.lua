@@ -373,7 +373,6 @@ end
 
 -- [5] SHOW REAL PING PANEL
 local pingGui = nil
-local pingThread = nil
 
 local function CreateStreePanel()
     local Players = game:GetService("Players")
@@ -392,77 +391,49 @@ local function CreateStreePanel()
     gui.Enabled = false
     gui.Parent = CoreGui
 
-    -- Frame utama (ukuran responsif)
+    -- Frame utama (lebih compact)
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 245, 0, 92)
-    main.Position = UDim2.new(0.5, -122.5, 1, -130)
-    main.BackgroundColor3 = Color3.fromRGB(20, 0, 40)
-    main.BackgroundTransparency = 0.25
+    main.Size = UDim2.new(0, 220, 0, 60)
+    main.Position = UDim2.new(0.5, -110, 0, 10) -- Posisi di atas tengah
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    main.BackgroundTransparency = 0.2
     main.BorderSizePixel = 0
     main.Active = true
     main.Parent = gui
 
-    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 16)
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 
     local stroke = Instance.new("UIStroke", main)
     stroke.Color = Color3.fromRGB(140, 0, 255)
-    stroke.Thickness = 2
-
-    -- Header
-    local header = Instance.new("Frame", main)
-    header.Size = UDim2.new(1, 0, 0, 28)
-    header.BackgroundColor3 = Color3.fromRGB(40, 0, 80)
-    header.BackgroundTransparency = 0.85
-    header.BorderSizePixel = 0
-
-    local logo = Instance.new("ImageLabel", header)
-    logo.Image = "rbxassetid://77194008928196"
-    logo.Size = UDim2.new(0, 20, 0, 20)
-    logo.Position = UDim2.new(0, 8, 0.5, -10)
-    logo.BackgroundTransparency = 1
-    logo.ImageColor3 = Color3.fromRGB(140, 0, 255)
-
-    local title = Instance.new("TextLabel", header)
-    title.Size = UDim2.new(1, -40, 1, 0)
-    title.Position = UDim2.new(0, 34, 0, 0)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 13
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Text = "REALTIME STATS"
-    title.TextColor3 = Color3.fromRGB(140, 0, 255)
+    stroke.Thickness = 1.5
 
     -- Stats Container
     local statsFrame = Instance.new("Frame", main)
-    statsFrame.Position = UDim2.new(0, 8, 0, 32)
-    statsFrame.Size = UDim2.new(1, -16, 1, -38)
+    statsFrame.Position = UDim2.new(0, 8, 0, 6)
+    statsFrame.Size = UDim2.new(1, -16, 1, -12)
     statsFrame.BackgroundTransparency = 1
 
     local layout = Instance.new("UIListLayout", statsFrame)
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    layout.Padding = UDim.new(0, 8)
+    layout.Padding = UDim.new(0, 6)
 
     local function makeStat()
         local box = Instance.new("Frame")
-        box.Size = UDim2.new(0, 52, 1, 0)
-        box.BackgroundColor3 = Color3.fromRGB(30, 0, 60)
-        box.BackgroundTransparency = 0.15
+        box.Size = UDim2.new(0, 48, 1, 0)
+        box.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+        box.BackgroundTransparency = 0.3
         box.BorderSizePixel = 0
-        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
-
-        local stroke = Instance.new("UIStroke", box)
-        stroke.Color = Color3.fromRGB(140, 0, 255)
-        stroke.Thickness = 1.5
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
 
         local label = Instance.new("TextLabel", box)
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 11.5
+        label.TextSize = 10
         label.TextWrapped = true
-        label.TextColor3 = Color3.fromRGB(220, 200, 255)
+        label.TextColor3 = Color3.fromRGB(200, 200, 220)
 
         box.Parent = statsFrame
         return label
@@ -470,14 +441,13 @@ local function CreateStreePanel()
 
     local pingLabel  = makeStat()
     local fpsLabel   = makeStat()
-    local notifLabel = makeStat()
     local timeLabel  = makeStat()
 
-    -- Draggable
+    -- Draggable (seluruh panel bisa di-drag)
     local dragging = false
     local dragStart, startPos
 
-    header.InputBegan:Connect(function(input)
+    main.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -525,24 +495,6 @@ local function CreateStreePanel()
         return 0
     end
 
-    local function getTotalNotifications()
-        local success, count = pcall(function()
-            local textNotifications = playerGui:FindFirstChild("Text Notifications")
-            if textNotifications then
-                local frame = textNotifications:FindFirstChild("Frame")
-                if frame then
-                    local notifCount = 0
-                    for _, child in ipairs(frame:GetChildren()) do
-                        if child.Name == "Tile" then notifCount += 1 end
-                    end
-                    return notifCount
-                end
-            end
-            return 0
-        end)
-        return success and count or 0
-    end
-
     local sessionStartTime = tick()
 
     local function formatTime(seconds)
@@ -570,20 +522,17 @@ local function CreateStreePanel()
     task.spawn(function()
         while gui.Parent do
             local ping = getPing()
-            local notifCount = getTotalNotifications()
             local elapsed = tick() - sessionStartTime
             local timerText = formatTime(elapsed)
 
-            pingLabel.Text  = "PING\n" .. ping .. "ms"
+            pingLabel.Text  = "PING\n" .. ping
             fpsLabel.Text   = "FPS\n" .. fps
-            notifLabel.Text = "NOTIF\n" .. notifCount
             timeLabel.Text  = "TIME\n" .. timerText
 
             color(pingLabel, ping, 120, 200)
             color(fpsLabel, fps, 40, 90)
-            color(notifLabel, notifCount, 8, 20)
 
-            task.wait(1)
+            task.wait(0.5) -- Update lebih cepat
         end
     end)
 
