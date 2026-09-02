@@ -268,37 +268,23 @@ end
 -- SUPPORT FEATURES IMPLEMENTATION
 -- ============================================================
 
--- [1] NO FISHING ANIMATION + [DISABLE SKIN EFFECT] share satu hook animator
+-- [1] NO ANIMATIONS: Blokir semua animasi karakter
 local animConn = nil
-local FISHING_ANIM_KEYWORDS = {
-    "FishCaught", "ReelStart", "RodThrow", "ReelingIdle",
-    "ReelIntermission", "Cast", "Fishing", "Reel"
-}
-local function isFishingAnim(name)
-    for _, kw in ipairs(FISHING_ANIM_KEYWORDS) do
-        if string.find(name, kw) then return true end
-    end
-    return false
-end
 
 local function applyAnimationHook(char)
     if animConn then animConn:Disconnect() animConn = nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
+    
+    -- Hentikan semua animasi yang sedang berjalan saat ini (saat spawn/respawn)
+    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+        track:Stop(0)
+    end
+    
     local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     animConn = animator.AnimationPlayed:Connect(function(track)
-        local animName = track.Animation and track.Animation.Name or ""
-        if Config.NoFishingAnim and isFishingAnim(animName) then
-            track:Stop(0)
-            return
-        end
-        if Config.DisableSkinEffect then
-            -- efek skin = animasi prefix "Skin - xxx"; blok selain default
-            if string.find(animName, " - ") then
-                track:Stop(0)
-                return
-            end
-        end
+        -- Blokir SEMUA animasi agar tidak ada yang berjalan
+        track:Stop(0)
     end)
 end
 
@@ -306,11 +292,13 @@ if getCharacter() then applyAnimationHook(getCharacter()) end
 table.insert(Conns, LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.6)
     applyAnimationHook(char)
+    
     -- auto equip rod on spawn
     if Config.AutoEquipRod then
         task.wait(0.5)
         equipRod()
     end
+    
     -- auto tp saved location on spawn
     if _G.NiCH_SaveLocation and Config.AutoTpOnSpawn then
         task.wait(0.8)
