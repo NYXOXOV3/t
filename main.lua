@@ -268,30 +268,59 @@ end
 -- SUPPORT FEATURES IMPLEMENTATION
 -- ============================================================
 
--- [1] NO ANIMATIONS: Blokir semua animasi karakter
+-- [1] NO ANIMATIONS: Blokir semua animasi karakter (dengan toggle on/off)
 local animConn = nil
 
-local function applyAnimationHook(char)
-    if animConn then animConn:Disconnect() animConn = nil end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    
-    -- Hentikan semua animasi yang sedang berjalan saat ini (saat spawn/respawn)
-    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
-        track:Stop(0)
+local function applyNoAnimation(on)
+    -- Putus koneksi lama dulu
+    if animConn then 
+        animConn:Disconnect() 
+        animConn = nil 
     end
     
-    local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
-    animConn = animator.AnimationPlayed:Connect(function(track)
-        -- Blokir SEMUA animasi agar tidak ada yang berjalan
-        track:Stop(0)
-    end)
+    if on then
+        local char = getCharacter()
+        if not char then return end
+        
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        
+        -- Hentikan semua animasi yang sedang berjalan saat ini
+        for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+            track:Stop(0)
+        end
+        
+        local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+        animConn = animator.AnimationPlayed:Connect(function(track)
+            track:Stop(0)
+        end)
+    else
+        -- Saat off, biarkan animasi berjalan normal
+        local char = getCharacter()
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                -- Resume animasi default (jalan, idle, dll) dengan memuat ulang animator
+                local animator = hum:FindFirstChildOfClass("Animator")
+                if animator then
+                    -- Reload animator agar animasi default bisa jalan lagi
+                    local oldParent = animator.Parent
+                    animator.Parent = nil
+                    animator.Parent = oldParent
+                end
+            end
+        end
+    end
 end
 
-if getCharacter() then applyAnimationHook(getCharacter()) end
+-- Hook saat karakter spawn (untuk auto equip rod & auto tp)
 table.insert(Conns, LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.6)
-    applyAnimationHook(char)
+    
+    -- Jika fitur NoAnimation sedang aktif, re-apply hook ke karakter baru
+    if Config.NoAnimation then
+        applyNoAnimation(true)
+    end
     
     -- auto equip rod on spawn
     if Config.AutoEquipRod then
@@ -308,6 +337,11 @@ table.insert(Conns, LocalPlayer.CharacterAdded:Connect(function(char)
         end
     end
 end))
+
+-- Apply awal jika karakter sudah ada
+if getCharacter() and Config.NoAnimation then
+    applyNoAnimation(true)
+end
 
 -- [2] AUTO EQUIP ROD toggle langsung equip
 local function doAutoEquipRod(on)
