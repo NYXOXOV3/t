@@ -590,39 +590,65 @@ local function applyDisableFishNotif(on)
     notifConnsToggled = on
 end
 
--- [8] WALK ON WATER: platform mengikuti kaki
-local wowPlatform = nil
-local wowThread = nil
-local function ensureWowPlatform(pos)
-    if wowPlatform and wowPlatform.Parent then
-        wowPlatform.Position = pos - Vector3.new(0, 5, 0)
-        return
-    end
-    wowPlatform = Instance.new("Part")
-    wowPlatform.Name = "NiCH_WoW"
-    wowPlatform.Size = Vector3.new(15, 1, 15)
-    wowPlatform.Anchored = true
-    wowPlatform.CanCollide = true
-    wowPlatform.Transparency = 1
-    wowPlatform.Position = pos - Vector3.new(0, 5, 0)
-    wowPlatform.Parent = workspace
-end
+-- [8] WALK ON WATER: platform mengikuti kaki (Standalone Function)
+local walkOnWaterConnection = nil
+local isWalkOnWater = false
+local waterPlatform = nil
 
 local function applyWalkOnWater(on)
     if on then
-        if wowThread then task.cancel(wowThread) end
-        wowThread = task.spawn(function()
-            while Config.WalkOnWater do
-                local hrp = getHrp()
-                if hrp and hrp.Position.Y < 5 then
-                    ensureWowPlatform(hrp.Position)
+        isWalkOnWater = true
+        
+        if not waterPlatform or not waterPlatform.Parent then
+            waterPlatform = Instance.new("Part")
+            waterPlatform.Name = "WaterPlatform"
+            waterPlatform.Anchored = true
+            waterPlatform.CanCollide = true
+            waterPlatform.Transparency = 1 
+            waterPlatform.Size = Vector3.new(15, 1, 15)
+            waterPlatform.Parent = workspace
+        end
+        
+        if walkOnWaterConnection then walkOnWaterConnection:Disconnect() end
+        walkOnWaterConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            local character = game.Players.LocalPlayer.Character
+            if not isWalkOnWater or not character then return end
+            
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {workspace.Terrain} 
+            rayParams.FilterType = Enum.RaycastFilterType.Include
+            rayParams.IgnoreWater = false
+            
+            local result = workspace:Raycast(hrp.Position + Vector3.new(0, 5, 0), Vector3.new(0, -500, 0), rayParams)
+            
+            if result and result.Material == Enum.Material.Water then
+                local waterSurfaceHeight = result.Position.Y
+                waterPlatform.Position = Vector3.new(hrp.Position.X, waterSurfaceHeight, hrp.Position.Z)
+                
+                if hrp.Position.Y < (waterSurfaceHeight + 2) and hrp.Position.Y > (waterSurfaceHeight - 5) then
+                    if not game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                        hrp.CFrame = CFrame.new(hrp.Position.X, waterSurfaceHeight + 3.2, hrp.Position.Z)
+                    end
                 end
-                task.wait(0.2)
+            else
+                waterPlatform.Position = Vector3.new(hrp.Position.X, -500, hrp.Position.Z)
             end
         end)
     else
-        if wowThread then task.cancel(wowThread) wowThread = nil end
-        if wowPlatform then pcall(function() wowPlatform:Destroy() end) wowPlatform = nil end
+        isWalkOnWater = false
+        
+        if walkOnWaterConnection then 
+            walkOnWaterConnection:Disconnect() 
+            walkOnWaterConnection = nil 
+        end
+        
+        if waterPlatform then 
+            waterPlatform:Destroy() 
+            waterPlatform = nil 
+        end
     end
 end
 
