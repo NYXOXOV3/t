@@ -595,16 +595,16 @@ local wowPlatform = nil
 local wowThread = nil
 local function ensureWowPlatform(pos)
     if wowPlatform and wowPlatform.Parent then
-        wowPlatform.Position = pos - Vector3.new(0, 3, 0)
+        wowPlatform.Position = pos - Vector3.new(0, 5, 0)
         return
     end
     wowPlatform = Instance.new("Part")
     wowPlatform.Name = "NiCH_WoW"
-    wowPlatform.Size = Vector3.new(8, 1, 8)
+    wowPlatform.Size = Vector3.new(15, 1, 15)
     wowPlatform.Anchored = true
     wowPlatform.CanCollide = true
-    wowPlatform.Transparency = 0.85
-    wowPlatform.Position = pos - Vector3.new(0, 3, 0)
+    wowPlatform.Transparency = 1
+    wowPlatform.Position = pos - Vector3.new(0, 5, 0)
     wowPlatform.Parent = workspace
 end
 
